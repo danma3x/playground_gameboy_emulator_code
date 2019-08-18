@@ -1,3 +1,4 @@
+#![allow(warnings)]
 use crate::mmu::MMU;
 
 use super::operations::*;
@@ -35,6 +36,17 @@ const fn op_block(table: [u64; 4], op8: usize) -> u64 {
 fn cb_prefix(cpu: &mut LR35902, mmu: &mut MMU, bytes: [u8;4]) {
     let cb_opcode = bytes[1];
     CB_INS_TABLE[cb_opcode as usize](cpu, mmu, bytes);
+}
+
+const fn variety_cb(opcode: u8) -> u8 {
+    let (h, l) = ((opcode & 0xF0) >> 4, (opcode & 0x0F));
+    let h_mod = h % 0x4;
+    (h_mod * 2) + (l / 8)
+}
+
+/// checks if the condition
+const fn condition(opcode: u8, flag_byte: u8) -> bool {
+
 }
 
 /// Opcode processing and all cpu operation is actually described here, because this macro will codegen a unique function for each opcode and all the IF statements should be compiled away.
@@ -89,11 +101,11 @@ macro_rules! g {
             // Store temp
             expand!(OP_DST_REGISTER_A, { cpu.a = t_src as u8; println!("Storing to register A");});
             expand!(OP_DST_REGISTER_B, { cpu.b = t_src as u8; println!("Storing to register B");});
-            expand!(OP_DST_REGISTER_C, { cpu.c = t_src as u8; });
-            expand!(OP_DST_REGISTER_D, { cpu.d = t_src as u8; });
-            expand!(OP_DST_REGISTER_E, { cpu.e = t_src as u8; });
-            expand!(OP_DST_REGISTER_H, { cpu.h = t_src as u8; });
-            expand!(OP_DST_REGISTER_L, { cpu.l = t_src as u8; });
+            expand!(OP_DST_REGISTER_C, { cpu.c = t_src as u8; println!("Storing to register C");});
+            expand!(OP_DST_REGISTER_D, { cpu.d = t_src as u8; println!("Storing to register D");});
+            expand!(OP_DST_REGISTER_E, { cpu.e = t_src as u8; println!("Storing to register E");});
+            expand!(OP_DST_REGISTER_H, { cpu.h = t_src as u8; println!("Storing to register H");});
+            expand!(OP_DST_REGISTER_L, { cpu.l = t_src as u8; println!("Storing to register L");});
             expand!(OP_DST_REGISTER_SP, { cpu.sp = t_src as u16; println!("Storing value to SP");});
             expand!(OP_DST_REGISTER_HL, { cpu.h = (t_src >> 8) as u8; cpu.l = t_src as u8; println!("Storing value to HL");});
 
@@ -114,20 +126,23 @@ macro_rules! cb_g {
             let mut _enable_interrupts = false;
             let mut _interrupts_enabled = true;
             let mut _condition = false;
+            let mut variety=0;
             macro_rules! expand {
                 ($x:expr, $c:block) => {
                     let op_block = op_block($x, op8);//$x[op8];
                     if (op_block & op8m) > 0 $c
                 }
             }
-            expand!(CBOP_SRC_R_A, {});
-            expand!(CBOP_SRC_R_B, {});
-            expand!(CBOP_SRC_R_C, {});
-            expand!(CBOP_SRC_R_D, {});
-            expand!(CBOP_SRC_R_E, {});
-            expand!(CBOP_SRC_R_H, {});
-            expand!(CBOP_SRC_R_L, {});
+            expand!(CBOP_VARIETY, { variety = variety_cb($opcode); });
+            expand!(CBOP_SRC_R_A, { t_src = cpu.a as u64; println!("Loading from register A");});
+            expand!(CBOP_SRC_R_B, { t_src = cpu.b as u64; println!("Loading from register B");});
+            expand!(CBOP_SRC_R_C, { t_src = cpu.c as u64; println!("Loading from register C");});
+            expand!(CBOP_SRC_R_D, { t_src = cpu.d as u64; println!("Loading from register D");});
+            expand!(CBOP_SRC_R_E, { t_src = cpu.e as u64; println!("Loading from register E");});
+            expand!(CBOP_SRC_R_H, { t_src = cpu.h as u64; println!("Loading from register H");});
+            expand!(CBOP_SRC_R_L, { t_src = cpu.l as u64; println!("Loading from register L");});
             expand!(CBOP_SRC_AR_HL, {});
+            expand!(CBOP_BIT, { let t = (t_src & (0x1) << variety) > 0; if t { cpu.set_flag(Flag::Z); println!("Setting Z flag")} cpu.set_flag(Flag::H); cpu.reset_flag(Flag::N)});
             cpu.t += $t;
             cpu.pc += $m;
         }
