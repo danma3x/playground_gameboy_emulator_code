@@ -44,9 +44,10 @@ const fn variety_cb(opcode: u8) -> u8 {
     (h_mod * 2) + (l / 8)
 }
 
-/// checks if the condition
-const fn condition(opcode: u8, flag_byte: u8) -> bool {
-
+fn half_carry_add_u8(op: u8, op2: u8) -> (bool, bool, u8) { // carry, half carry, result
+    let half_carry = ((0x0F&op) + (0x0F&op2)&0x10) > 0;
+    let (result, carry) = op.overflowing_add(op2);
+    (carry ,half_carry, op + op2)
 }
 
 /// Opcode processing and all cpu operation is actually described here, because this macro will codegen a unique function for each opcode and all the IF statements should be compiled away.
@@ -58,9 +59,9 @@ macro_rules! g {
             let (op8, op8m) = op8_helper($opcode);
             let mut t_src: u64 = 0;
             let mut t_dst: u64 = 0;
-            let mut _enable_interrupts = false;
-            let mut _interrupts_enabled = true;
-            let mut _condition = false;
+            let mut enable_interrupts = false;
+            let mut interrupts_enabled = true;
+            let mut condition = false;
             macro_rules! expand {
                ($x:expr, $c:block) => {
                     let op_block = op_block($x, op8);//$x[op8];
@@ -74,8 +75,8 @@ macro_rules! g {
             expand!(OP_SRC_REGISTER_C, { t_src = cpu.c as u64; });
             expand!(OP_SRC_REGISTER_D, { t_src = cpu.d as u64; });
             expand!(OP_SRC_REGISTER_E, { t_src = cpu.e as u64; }); // source e
-            expand!(OP_SRC_REGISTER_H, { t_src = cpu.e as u64; }); // source e
-            expand!(OP_SRC_REGISTER_L, { t_src = cpu.e as u64; }); // source e
+            expand!(OP_SRC_REGISTER_H, { t_src = cpu.h as u64; }); // source h
+            expand!(OP_SRC_REGISTER_L, { t_src = cpu.l as u64; }); // source l
             expand!(OP_SRC_REGISTER_AF, { t_src = (cpu.a as u64) << 8 | (cpu.f as u64); }); // source AF
             expand!(OP_SRC_REGISTER_BC, { t_src = (cpu.b as u64) << 8 | (cpu.c as u64); }); // source BC
             expand!(OP_SRC_REGISTER_DE, { t_src = (cpu.d as u64) << 8 | (cpu.e as u64); }); // source DE
@@ -96,6 +97,14 @@ macro_rules! g {
             expand!(OP_POP, { t_src = cpu.pop(&mmu) as u64; });
             // Operations
             expand!(OP_XOR, { t_src = (cpu.a ^ (t_src as u8)) as u64; println!("XOR operation");});
+            expand!(OP_OR, { t_src = (cpu.a | (t_src as u8)) as u64; println!("OR operation");});
+            expand!(OP_AND, { t_src = (cpu.a & (t_src as u8)) as u64; println!("AND operation");});
+            expand!(OP_EXAMPLE, { 
+                let (carry, half_carry, result) = half_carry_add_u8(cpu.a, t_src as u8);
+                if half_carry { 
+                    cpu.set_flag(Flag::H); 
+                    }
+                }); // todo r8 addition
             // Flags
             expand!(OP_Z_SET_ZERO, { println!("Checking if Z Flag needs to be flipped"); if t_src == 0 { cpu.set_flag(Flag::Z); println!("Z flag flipped") }});
             // Store temp
@@ -108,10 +117,34 @@ macro_rules! g {
             expand!(OP_DST_REGISTER_L, { cpu.l = t_src as u8; println!("Storing to register L");});
             expand!(OP_DST_REGISTER_SP, { cpu.sp = t_src as u16; println!("Storing value to SP");});
             expand!(OP_DST_REGISTER_HL, { cpu.h = (t_src >> 8) as u8; cpu.l = t_src as u8; println!("Storing value to HL");});
-
             expand!(OP_DST_A16, { mmu.write_byte(t_dst as usize, t_src as u8); println!("Writing {} to location {}", t_src, t_dst); });
+
+            expand!(OP_SET_N, { cpu.set_flag(Flag::N); });
+            expand!(OP_SET_H, { cpu.set_flag(Flag::H); });
+            expand!(OP_SET_C, { cpu.set_flag(Flag::C); });
+            expand!(OP_RESET_Z, { cpu.reset_flag(Flag::Z); });
+            expand!(OP_RESET_N, { cpu.reset_flag(Flag::N); });
+            expand!(OP_RESET_H, { cpu.reset_flag(Flag::H); });
+            expand!(OP_RESET_C, { cpu.reset_flag(Flag::C); });
+            // set an appropriate flag as a condition here ?
+            expand!(OP_EXAMPLE, { condition = cpu.get_flag(Flag::Z); });
+            expand!(OP_EXAMPLE, { condition = cpu.get_flag(Flag::C); });
+            expand!(OP_EXAMPLE, { condition = !condition; }); // crutch for NC, NZ
+            // break flow operation ?
+            expand!(OP_EXAMPLE, { if condition { return;}});
+            // jump operations ?
+            expand!(OP_CALL_STACK, { cpu.push(&mut mmu, cpu.sp + 1); });
+            expand!(OP_GENERAL_JUMP, { cpu.sp = t_src as u16; }); // let's assume we have the address into t_src here
             cpu.t += $t;
             cpu.pc += $m;
+
+            expand!(OP_EXAMPLE, { interrupts_enabled = false; }); // disable interrupts op
+            expand!(OP_EXAMPLE, { enable_interrupts = true; }); // enable interrupts op
+
+            if enable_interrupts {
+                interrupts_enabled = true;
+                enable_interrupts = false;
+            }
         }
     }
 }
