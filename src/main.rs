@@ -7,7 +7,7 @@ use std::io::{Read};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut mmu  = {
         let mut mmu = MMU::new();
-        let mut file = File::open("/home/danmatrix/DMG_ROM.bin").expect("Couldn't find the file");
+        let mut file = File::open("D:/hobby/DMG_ROM.bin").expect("Couldn't find the file");
         let mut buf = Vec::new();
         file.read_to_end(&mut buf).expect("Failed to read the file");
         mmu.initialize(buf);
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut cpu = LR35902::new();
-    for _ in 0..5 {
+    for _ in 0..100 {
         cpu.execute(&mut mmu);
         println!("CPU state: {:?}", cpu);
     }

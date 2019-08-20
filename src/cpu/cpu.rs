@@ -58,10 +58,15 @@ macro_rules! g {
         {
             let (op8, op8m) = op8_helper($opcode);
             let mut t_src: u64 = 0;
+            let mut addr: i8 = 0;
             let mut t_dst: u64 = 0;
             let mut enable_interrupts = false;
             let mut interrupts_enabled = true;
             let mut condition = false;
+
+            cpu.t += $t;
+            cpu.pc += $m;
+
             macro_rules! expand {
                ($x:expr, $c:block) => {
                     let op_block = op_block($x, op8);//$x[op8];
@@ -82,11 +87,14 @@ macro_rules! g {
             expand!(OP_SRC_REGISTER_DE, { t_src = (cpu.d as u64) << 8 | (cpu.e as u64); }); // source DE
             expand!(OP_SRC_REGISTER_HL, { t_src = (cpu.h as u64) << 8 | (cpu.l as u64); }); // source HL
             expand!(OP_SRC_REGISTER_SP, { t_src = cpu.sp as u64; }); // source SP
+            expand!(OP_SRC_REGISTER_PC, { t_src = cpu.pc as u64; }); // used for relative jumps etc.
             expand!(OP_SRC_D8, { t_src = bytes[1] as u64; }); // source d8
+            expand!(OP_SRC_I8, { addr = bytes[1] as i8; println!("Loaded signed value {}", addr); });
             expand!(OP_SRC_D16, { t_src = (bytes[1] as u64) | ((bytes[2] as u64) << 8); println!("Loaded D16");}); // source d16
             expand!(OP_SRC_STACK_OFFSET, {});
             expand!(OP_SRC_8BIT_REL_ADDRESS, { t_src = t_src | 0xFF00; });
             expand!(OP_SRC_A16, { t_src = mmu.read_byte(t_src as usize) as u64; });
+            expand!(OP_TRANSFORM_ADDRESS, { t_src = t_src.wrapping_add(addr as u64); println!("Target address is now {}", t_src); });
             expand!(OP_ADD_4_CLOCKS_CONDITION, {});
             expand!(OP_ADD_12_CLOCKS_CONDITION, {});
             // Load destination address
@@ -127,19 +135,19 @@ macro_rules! g {
             expand!(OP_RESET_H, { cpu.reset_flag(Flag::H); });
             expand!(OP_RESET_C, { cpu.reset_flag(Flag::C); });
             // set an appropriate flag as a condition here ?
-            expand!(OP_EXAMPLE, { condition = cpu.get_flag(Flag::Z); });
-            expand!(OP_EXAMPLE, { condition = cpu.get_flag(Flag::C); });
-            expand!(OP_EXAMPLE, { condition = !condition; }); // crutch for NC, NZ
+            expand!(OP_CONDITION_Z, { condition = cpu.get_flag(Flag::Z); println!("Conditional jump Z"); });
+            expand!(OP_CONDITION_C, { condition = cpu.get_flag(Flag::C); println!("Conditional jump C"); });
+            expand!(OP_CONDITION_NEGATE, { condition = !condition; }); // crutch for NC, NZ
             // break flow operation ?
-            expand!(OP_EXAMPLE, { if condition { return;}});
+            expand!(OP_CONDITIONAL_BREAKFLOW, { if condition { return; }} );
             // jump operations ?
             expand!(OP_CALL_STACK, { cpu.push(&mut mmu, cpu.sp + 1); });
-            expand!(OP_GENERAL_JUMP, { cpu.sp = t_src as u16; }); // let's assume we have the address into t_src here
-            cpu.t += $t;
-            cpu.pc += $m;
+            expand!(OP_GENERAL_JUMP, { cpu.pc = t_src as u16; }); // let's assume we have the address into t_src here
+            expand!(OP_ADD_4_CLOCKS_CONDITION, { cpu.t += 4; }); // TODO: correct clocks, to subtract if we reach here instead
+            expand!(OP_ADD_12_CLOCKS_CONDITION, { cpu.t += 12; });
 
-            expand!(OP_EXAMPLE, { interrupts_enabled = false; }); // disable interrupts op
-            expand!(OP_EXAMPLE, { enable_interrupts = true; }); // enable interrupts op
+            expand!(OP_DI, { interrupts_enabled = false; }); // disable interrupts op
+            expand!(OP_EI, { enable_interrupts = true; }); // enable interrupts op
 
             if enable_interrupts {
                 interrupts_enabled = true;
@@ -270,5 +278,22 @@ impl LR35902 {
         let bytes = mmu.read_ahead(self.pc as usize);
         let opcode = bytes[0];
         INS_TABLE[opcode as usize](self, mmu, bytes);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn prerequisites() -> ( LR35902, MMU ){
+        ( LR35902::new(), MMU::new() )
+    }
+    #[test]
+    fn test_20() {
+        let ( mut cpu, mut mmu ) = prerequisites();
+        cpu.set_flag(Flag::Z);
+        // pc should be 0
+        INS_TABLE[0x20](&mut cpu, &mut mmu, [0,10,0,0]);
+        // and probably 10 now. correction, 12, because the instruction is 2 bytes long
+        assert_eq!(cpu.pc, 12);
     }
 }
