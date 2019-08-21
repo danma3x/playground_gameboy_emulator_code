@@ -20,18 +20,18 @@ pub struct LR35902 {
     f: u8,
     h: u8,
     l: u8,
-    pc: u16,
+    pub pc: u16,
     sp: u16,
     t: usize,
 }
 
-const fn op8_helper(opcode: u8) -> (usize, u64) {
-    ((opcode / 64) as usize, (1 << ((opcode as u64) % 64)))
-}
-
-const fn op_block(table: [u64; 4], op8: usize) -> u64 {
-    table[op8]
-}
+//const fn op8_helper(opcode: u8) -> (usize, u64) {
+//    ((opcode / 64) as usize, (1 << ((opcode as u64) % 64)))
+//}
+//
+//const fn op_block(table: [u64; 4], op8: usize) -> u64 {
+//    table[op8]
+//}
 
 fn cb_prefix(cpu: &mut LR35902, mmu: &mut MMU, bytes: [u8;4]) {
     let cb_opcode = bytes[1];
@@ -52,11 +52,11 @@ fn half_carry_add_u8(op: u8, op2: u8) -> (bool, bool, u8) { // carry, half carry
 
 /// Opcode processing and all cpu operation is actually described here, because this macro will codegen a unique function for each opcode and all the IF statements should be compiled away.
 /// Not much code here yet, but we should be able all of the possible operations here and get away without severe performance penalty thanks to compile time optimisations and the final code shouldn't be too hard, though 0xCB prefix will be a headache I guess
-macro_rules! g {
-    ($opcode:literal, $m:literal, $t:literal) => {
+macro_rules! g { // short for generate
+    ($opcode:literal, $inst_size:literal, $timing:literal) => {
         |mut cpu, mut mmu, bytes|
         {
-            let (op8, op8m) = op8_helper($opcode);
+            // let (op8, op8m) = op8_helper($opcode);
             let mut t_src: u64 = 0;
             let mut addr: i8 = 0;
             let mut t_dst: u64 = 0;
@@ -64,19 +64,19 @@ macro_rules! g {
             let mut interrupts_enabled = true;
             let mut condition = false;
 
-            cpu.t += $t;
-            cpu.pc += $m;
+            cpu.t += $timing;
+            cpu.pc += $inst_size;
 
             macro_rules! expand {
-               ($x:expr, $c:block) => {
-                    let op_block = op_block($x, op8);//$x[op8];
-                    if (op_block & op8m) > 0 $c
+               ($operation:expr, $code:block) => {
+                    if $operation[$opcode] > 0 $code
                 }
             }
-            expand!(OP_ILLEGAL, {panic!("Illegal operation {}", $opcode)});
+
+            expand!(OP_ILLEGAL, { panic!("Illegal operation {}", $opcode); });
             // Load
-            expand!(OP_SRC_REGISTER_A, { t_src = cpu.a as u64; println!("Loaded register A");});
-            expand!(OP_SRC_REGISTER_B, { t_src = cpu.b as u64; println!("Loaded register B");});
+            expand!(OP_SRC_REGISTER_A, { t_src = cpu.a as u64; });
+            expand!(OP_SRC_REGISTER_B, { t_src = cpu.b as u64; });
             expand!(OP_SRC_REGISTER_C, { t_src = cpu.c as u64; });
             expand!(OP_SRC_REGISTER_D, { t_src = cpu.d as u64; });
             expand!(OP_SRC_REGISTER_E, { t_src = cpu.e as u64; }); // source e
@@ -89,12 +89,12 @@ macro_rules! g {
             expand!(OP_SRC_REGISTER_SP, { t_src = cpu.sp as u64; }); // source SP
             expand!(OP_SRC_REGISTER_PC, { t_src = cpu.pc as u64; }); // used for relative jumps etc.
             expand!(OP_SRC_D8, { t_src = bytes[1] as u64; }); // source d8
-            expand!(OP_SRC_I8, { addr = bytes[1] as i8; println!("Loaded signed value {}", addr); });
-            expand!(OP_SRC_D16, { t_src = (bytes[1] as u64) | ((bytes[2] as u64) << 8); println!("Loaded D16");}); // source d16
-            expand!(OP_SRC_STACK_OFFSET, {});
+            expand!(OP_SRC_I8, { addr = bytes[1] as i8; });
+            expand!(OP_SRC_D16, { t_src = (bytes[1] as u64) | ((bytes[2] as u64) << 8); }); // source d16
+            expand!(OP_SRC_STACK_OFFSET, {}); // have no idea what this is for atm, don't remember
             expand!(OP_SRC_8BIT_REL_ADDRESS, { t_src = t_src | 0xFF00; });
             expand!(OP_SRC_A16, { t_src = mmu.read_byte(t_src as usize) as u64; });
-            expand!(OP_TRANSFORM_ADDRESS, { t_src = t_src.wrapping_add(addr as u64); println!("Target address is now {}", t_src); });
+            expand!(OP_TRANSFORM_ADDRESS, { t_src = t_src.wrapping_add(addr as u64); });
             expand!(OP_ADD_4_CLOCKS_CONDITION, {});
             expand!(OP_ADD_12_CLOCKS_CONDITION, {});
             // Load destination address
@@ -104,9 +104,9 @@ macro_rules! g {
             expand!(OP_PUSH, { cpu.push(&mut mmu, t_src as u16); });
             expand!(OP_POP, { t_src = cpu.pop(&mmu) as u64; });
             // Operations
-            expand!(OP_XOR, { t_src = (cpu.a ^ (t_src as u8)) as u64; println!("XOR operation");});
-            expand!(OP_OR, { t_src = (cpu.a | (t_src as u8)) as u64; println!("OR operation");});
-            expand!(OP_AND, { t_src = (cpu.a & (t_src as u8)) as u64; println!("AND operation");});
+            expand!(OP_XOR, { t_src = (cpu.a ^ (t_src as u8)) as u64; });
+            expand!(OP_OR, { t_src = (cpu.a | (t_src as u8)) as u64; });
+            expand!(OP_AND, { t_src = (cpu.a & (t_src as u8)) as u64; });
             expand!(OP_EXAMPLE, { 
                 let (carry, half_carry, result) = half_carry_add_u8(cpu.a, t_src as u8);
                 if half_carry { 
@@ -114,18 +114,18 @@ macro_rules! g {
                     }
                 }); // todo r8 addition
             // Flags
-            expand!(OP_Z_SET_ZERO, { println!("Checking if Z Flag needs to be flipped"); if t_src == 0 { cpu.set_flag(Flag::Z); println!("Z flag flipped") }});
+            expand!(OP_Z_SET_ZERO, { if t_src == 0 { cpu.set_flag(Flag::Z); }});
             // Store temp
-            expand!(OP_DST_REGISTER_A, { cpu.a = t_src as u8; println!("Storing to register A");});
-            expand!(OP_DST_REGISTER_B, { cpu.b = t_src as u8; println!("Storing to register B");});
-            expand!(OP_DST_REGISTER_C, { cpu.c = t_src as u8; println!("Storing to register C");});
-            expand!(OP_DST_REGISTER_D, { cpu.d = t_src as u8; println!("Storing to register D");});
-            expand!(OP_DST_REGISTER_E, { cpu.e = t_src as u8; println!("Storing to register E");});
-            expand!(OP_DST_REGISTER_H, { cpu.h = t_src as u8; println!("Storing to register H");});
-            expand!(OP_DST_REGISTER_L, { cpu.l = t_src as u8; println!("Storing to register L");});
-            expand!(OP_DST_REGISTER_SP, { cpu.sp = t_src as u16; println!("Storing value to SP");});
-            expand!(OP_DST_REGISTER_HL, { cpu.h = (t_src >> 8) as u8; cpu.l = t_src as u8; println!("Storing value to HL");});
-            expand!(OP_DST_A16, { mmu.write_byte(t_dst as usize, t_src as u8); println!("Writing {} to location {}", t_src, t_dst); });
+            expand!(OP_DST_REGISTER_A, { cpu.a = t_src as u8; });
+            expand!(OP_DST_REGISTER_B, { cpu.b = t_src as u8; });
+            expand!(OP_DST_REGISTER_C, { cpu.c = t_src as u8; });
+            expand!(OP_DST_REGISTER_D, { cpu.d = t_src as u8; });
+            expand!(OP_DST_REGISTER_E, { cpu.e = t_src as u8; });
+            expand!(OP_DST_REGISTER_H, { cpu.h = t_src as u8; });
+            expand!(OP_DST_REGISTER_L, { cpu.l = t_src as u8; });
+            expand!(OP_DST_REGISTER_SP, { cpu.sp = t_src as u16; });
+            expand!(OP_DST_REGISTER_HL, { cpu.h = (t_src >> 8) as u8; cpu.l = t_src as u8; });
+            expand!(OP_DST_A16, { mmu.write_byte(t_dst as usize, t_src as u8); });
 
             expand!(OP_SET_N, { cpu.set_flag(Flag::N); });
             expand!(OP_SET_H, { cpu.set_flag(Flag::H); });
@@ -135,16 +135,16 @@ macro_rules! g {
             expand!(OP_RESET_H, { cpu.reset_flag(Flag::H); });
             expand!(OP_RESET_C, { cpu.reset_flag(Flag::C); });
             // set an appropriate flag as a condition here ?
-            expand!(OP_CONDITION_Z, { condition = cpu.get_flag(Flag::Z); println!("Conditional jump Z"); });
-            expand!(OP_CONDITION_C, { condition = cpu.get_flag(Flag::C); println!("Conditional jump C"); });
+            expand!(OP_CONDITION_Z, { condition = cpu.get_flag(Flag::Z); });
+            expand!(OP_CONDITION_C, { condition = cpu.get_flag(Flag::C); });
             expand!(OP_CONDITION_NEGATE, { condition = !condition; }); // crutch for NC, NZ
             // break flow operation ?
             expand!(OP_CONDITIONAL_BREAKFLOW, { if condition { return; }} );
             // jump operations ?
             expand!(OP_CALL_STACK, { cpu.push(&mut mmu, cpu.sp + 1); });
             expand!(OP_GENERAL_JUMP, { cpu.pc = t_src as u16; }); // let's assume we have the address into t_src here
-            expand!(OP_ADD_4_CLOCKS_CONDITION, { cpu.t += 4; }); // TODO: correct clocks, to subtract if we reach here instead
-            expand!(OP_ADD_12_CLOCKS_CONDITION, { cpu.t += 12; });
+            expand!(OP_ADD_4_CLOCKS_CONDITION, { if condition { cpu.t += 4; } });
+            expand!(OP_ADD_12_CLOCKS_CONDITION, { if condition { cpu.t += 12; } });
 
             expand!(OP_DI, { interrupts_enabled = false; }); // disable interrupts op
             expand!(OP_EI, { enable_interrupts = true; }); // enable interrupts op
@@ -157,42 +157,49 @@ macro_rules! g {
     }
 }
 
-macro_rules! cb_g {
-    ($opcode:literal, $m:literal, $t:literal) => {
-        |mut cpu, mut mmu, bytes|
-        {
-            let (op8, op8m) = op8_helper($opcode);
-            let mut t_src: u64 = 0;
-            let mut t_dst: u64 = 0;
-            let mut _enable_interrupts = false;
-            let mut _interrupts_enabled = true;
-            let mut _condition = false;
-            let mut variety=0;
-            macro_rules! expand {
-                ($x:expr, $c:block) => {
-                    let op_block = op_block($x, op8);//$x[op8];
-                    if (op_block & op8m) > 0 $c
-                }
-            }
-            expand!(CBOP_VARIETY, { variety = variety_cb($opcode); });
-            expand!(CBOP_SRC_R_A, { t_src = cpu.a as u64; println!("Loading from register A");});
-            expand!(CBOP_SRC_R_B, { t_src = cpu.b as u64; println!("Loading from register B");});
-            expand!(CBOP_SRC_R_C, { t_src = cpu.c as u64; println!("Loading from register C");});
-            expand!(CBOP_SRC_R_D, { t_src = cpu.d as u64; println!("Loading from register D");});
-            expand!(CBOP_SRC_R_E, { t_src = cpu.e as u64; println!("Loading from register E");});
-            expand!(CBOP_SRC_R_H, { t_src = cpu.h as u64; println!("Loading from register H");});
-            expand!(CBOP_SRC_R_L, { t_src = cpu.l as u64; println!("Loading from register L");});
-            expand!(CBOP_SRC_AR_HL, {});
-            expand!(CBOP_BIT, { let t = (t_src & (0x1) << variety) > 0; if t { cpu.set_flag(Flag::Z); println!("Setting Z flag")} cpu.set_flag(Flag::H); cpu.reset_flag(Flag::N)});
-            cpu.t += $t;
-            cpu.pc += $m;
-        }
-    }
-}
-
 /// Here this macro will expand in 0xFF of unique anonymous functions and we can just invoke these functions by indexing this array with the opcode
 /// Inspired by Bisqwit's Nesemu1
 type OpHandler = fn(cpu: &mut LR35902, mmu: &mut MMU, bytes: [u8;4]);
+
+macro_rules! cb_g {
+    ($opcode:literal, $inst_size:literal, $timing:literal) => {
+        |mut cpu, mut mmu, bytes|
+        {
+            //let (op8, op8m) = op8_helper($opcode);
+            let mut t_src: u64 = 0;
+            let mut t_dst: u64 = 0;
+            let mut _enable_interrupts = false; let mut _interrupts_enabled = true; // should be on cpu struct most likely, if we have two instruction tables
+            let mut _condition = false;
+            let mut variety=0;
+
+            cpu.t += $timing;
+            cpu.pc += $inst_size;
+
+            macro_rules! expand {
+               ($operation:expr, $code:block) => {
+                    if $operation[$opcode] > 0 $code
+                }
+            }
+            expand!(CBOP_VARIETY, { variety = variety_cb($opcode); });
+            expand!(CBOP_SRC_R_A, { t_src = cpu.a as u64;});
+            expand!(CBOP_SRC_R_B, { t_src = cpu.b as u64;});
+            expand!(CBOP_SRC_R_C, { t_src = cpu.c as u64;});
+            expand!(CBOP_SRC_R_D, { t_src = cpu.d as u64;});
+            expand!(CBOP_SRC_R_E, { t_src = cpu.e as u64;});
+            expand!(CBOP_SRC_R_H, { t_src = cpu.h as u64;});
+            expand!(CBOP_SRC_R_L, { t_src = cpu.l as u64;});
+            expand!(CBOP_SRC_AR_HL, {});
+            expand!(CBOP_BIT, {
+                let t = (t_src & (0x1 << variety)) > 0;
+                if !t {
+                        cpu.set_flag(Flag::Z);
+                    }
+                cpu.set_flag(Flag::H);
+                cpu.reset_flag(Flag::N);
+            });
+        }
+    }
+}
 const CB_OP: OpHandler = cb_prefix as OpHandler;
 pub const INS_TABLE: [OpHandler; 256] = [
     g!(0x00, 1, 4),  g!(0x01, 3, 12), g!(0x02, 1, 8),  g!(0x03, 1, 8),  g!(0x04, 1, 4),  g!(0x05, 1, 4),  g!(0x06, 2, 8),  g!(0x07, 1, 4),  g!(0x08, 3, 20), g!(0x09, 1, 8),  g!(0x0A, 1, 8),  g!(0x0B, 1, 8), g!(0x0C, 1, 4),  g!(0x0D, 1, 4),  g!(0x0E, 2, 8), g!(0x0F, 1, 4),
@@ -254,7 +261,7 @@ impl LR35902 {
     }
 
     pub fn reset_flag(&mut self, flag: Flag) {
-        self.f ^= 1 << (flag as u8);
+        self.f &= !(1 << (flag as u8));
     }
 
     pub fn get_flag(&self, flag: Flag) -> bool {
@@ -295,5 +302,33 @@ mod tests {
         INS_TABLE[0x20](&mut cpu, &mut mmu, [0,10,0,0]);
         // and probably 10 now. correction, 12, because the instruction is 2 bytes long
         assert_eq!(cpu.pc, 12);
+    }
+
+    #[test]
+    fn test_7c() { // BIT test
+        // I'm an idiot, that's a 0xCB prefix opcode, wth was I doing
+        let ( mut cpu, mut mmu ) = prerequisites();
+        cpu.h = 0b0000_0000;
+        println!("{:?}", cpu);
+        CB_INS_TABLE[0x7C](&mut cpu, &mut mmu, [0,0,0,0]);
+        println!("{:?}", cpu);
+        assert_eq!(cpu.get_flag(Flag::Z), true); // same
+        assert_eq!(cpu.get_flag(Flag::N), false);
+        assert_eq!(cpu.get_flag(Flag::H), true); // this one is ok
+        cpu.h = 0b1000_0000;
+        // CB_INS_TABLE[0x7C](&mut cpu, &mut mmu, [0,0,0,0]);
+        // assert_eq!(cpu.get_flag(Flag::Z), false); //TODO: have to check whether I need to unset the flag otherwise, probably so
+    }
+
+    #[test]
+    fn test_reset_flag() {
+        let ( mut cpu, _) = prerequisites();
+        assert_eq!(cpu.get_flag(Flag::N), false);
+        cpu.set_flag(Flag::N);
+        assert_eq!(cpu.get_flag(Flag::N), true);
+        cpu.reset_flag(Flag::N);
+        assert_eq!(cpu.get_flag(Flag::N), false);
+        cpu.reset_flag(Flag::N);
+        assert_eq!(cpu.get_flag(Flag::N), false);
     }
 }

@@ -15,9 +15,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut cpu = LR35902::new();
-    for _ in 0..100 {
+
+    loop {
         cpu.execute(&mut mmu);
-        println!("CPU state: {:?}", cpu);
+        // println!("{}", cpu.pc);
     }
     Ok(())
 }
