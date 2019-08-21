@@ -25,13 +25,13 @@ pub struct LR35902 {
     t: usize,
 }
 
-//const fn op8_helper(opcode: u8) -> (usize, u64) {
-//    ((opcode / 64) as usize, (1 << ((opcode as u64) % 64)))
-//}
-//
-//const fn op_block(table: [u64; 4], op8: usize) -> u64 {
-//    table[op8]
-//}
+const fn op8_helper(opcode: u8) -> (usize, u64) {
+   ((opcode / 16) as usize, (1 << ((opcode as u64) % 16)))
+}
+
+const fn op_block(table: [u16; 16], op8: usize) -> u16 {
+   table[op8]
+}
 
 fn cb_prefix(cpu: &mut LR35902, mmu: &mut MMU, bytes: [u8;4]) {
     let cb_opcode = bytes[1];
@@ -47,7 +47,7 @@ const fn variety_cb(opcode: u8) -> u8 {
 fn half_carry_add_u8(op: u8, op2: u8) -> (bool, bool, u8) { // carry, half carry, result
     let half_carry = ((0x0F&op) + (0x0F&op2)&0x10) > 0;
     let (result, carry) = op.overflowing_add(op2);
-    (carry ,half_carry, op + op2)
+    (carry, half_carry, op + op2)
 }
 
 /// Opcode processing and all cpu operation is actually described here, because this macro will codegen a unique function for each opcode and all the IF statements should be compiled away.
@@ -56,9 +56,11 @@ macro_rules! g { // short for generate
     ($opcode:literal, $inst_size:literal, $timing:literal) => {
         |mut cpu, mut mmu, bytes|
         {
-            // let (op8, op8m) = op8_helper($opcode);
+            let (op8, op8m) = op8_helper($opcode);
             let mut t_src: u64 = 0;
-            let mut addr: i8 = 0;
+            let mut t_abs_addr: u64; // let's try to roll with this
+                // I have to stop using t_src or t_dst for any addressing, I guess
+            let mut t_rel_addr: i8 = 0; // is for relative jumps, why did I even treat it like this then
             let mut t_dst: u64 = 0;
             let mut enable_interrupts = false;
             let mut interrupts_enabled = true;
@@ -69,7 +71,8 @@ macro_rules! g { // short for generate
 
             macro_rules! expand {
                ($operation:expr, $code:block) => {
-                    if $operation[$opcode] > 0 $code
+                    let op_block = op_block($operation, op8);
+                    if op_block & (0x1 << (16 - op8m)) > 0 $code
                 }
             }
 
@@ -88,13 +91,18 @@ macro_rules! g { // short for generate
             expand!(OP_SRC_REGISTER_HL, { t_src = (cpu.h as u64) << 8 | (cpu.l as u64); }); // source HL
             expand!(OP_SRC_REGISTER_SP, { t_src = cpu.sp as u64; }); // source SP
             expand!(OP_SRC_REGISTER_PC, { t_src = cpu.pc as u64; }); // used for relative jumps etc.
+            expand!(OP_ADDRESS_READ, { t_src = mmu.read_byte(t_src as usize) as u64; }); // offender
             expand!(OP_SRC_D8, { t_src = bytes[1] as u64; }); // source d8
-            expand!(OP_SRC_I8, { addr = bytes[1] as i8; });
             expand!(OP_SRC_D16, { t_src = (bytes[1] as u64) | ((bytes[2] as u64) << 8); }); // source d16
+            expand!(OP_SRC_A16, { t_src = mmu.read_byte(t_src as usize) as u64; });
+
+            expand!(OP_EXAMPLE, { t_rel_addr = t_src as i8; })
+            expand!(OP_EXAMPLE, { t_abs_addr = t_src; });
+            
+            ///expand!(OP_SRC_I8, { t_rel_addr = bytes[1] as i8; });
             expand!(OP_SRC_STACK_OFFSET, {}); // have no idea what this is for atm, don't remember
             expand!(OP_SRC_8BIT_REL_ADDRESS, { t_src = t_src | 0xFF00; });
-            expand!(OP_SRC_A16, { t_src = mmu.read_byte(t_src as usize) as u64; });
-            expand!(OP_TRANSFORM_ADDRESS, { t_src = t_src.wrapping_add(addr as u64); });
+            expand!(OP_TRANSFORM_ADDRESS, { t_src = t_src.wrapping_add(t_rel_addr as u64); });
             expand!(OP_ADD_4_CLOCKS_CONDITION, {});
             expand!(OP_ADD_12_CLOCKS_CONDITION, {});
             // Load destination address
@@ -125,7 +133,8 @@ macro_rules! g { // short for generate
             expand!(OP_DST_REGISTER_L, { cpu.l = t_src as u8; });
             expand!(OP_DST_REGISTER_SP, { cpu.sp = t_src as u16; });
             expand!(OP_DST_REGISTER_HL, { cpu.h = (t_src >> 8) as u8; cpu.l = t_src as u8; });
-            expand!(OP_DST_A16, { mmu.write_byte(t_dst as usize, t_src as u8); });
+            expand!(OP_DST_ADDRESS, { t_rel_addr = t_dst as i8; }); // this is one suspicious cast
+            expand!(OP_ADDRESS_WRITE, { mmu.write_byte(t_dst as usize, t_src as u8); });
 
             expand!(OP_SET_N, { cpu.set_flag(Flag::N); });
             expand!(OP_SET_H, { cpu.set_flag(Flag::H); });
@@ -165,7 +174,7 @@ macro_rules! cb_g {
     ($opcode:literal, $inst_size:literal, $timing:literal) => {
         |mut cpu, mut mmu, bytes|
         {
-            //let (op8, op8m) = op8_helper($opcode);
+            let (op8, op8m) = op8_helper($opcode);
             let mut t_src: u64 = 0;
             let mut t_dst: u64 = 0;
             let mut _enable_interrupts = false; let mut _interrupts_enabled = true; // should be on cpu struct most likely, if we have two instruction tables
@@ -177,7 +186,8 @@ macro_rules! cb_g {
 
             macro_rules! expand {
                ($operation:expr, $code:block) => {
-                    if $operation[$opcode] > 0 $code
+                    let op_block = op_block($operation, op8);
+                    if op_block & (0x1 << (16 - op8m)) > 0 $code
                 }
             }
             expand!(CBOP_VARIETY, { variety = variety_cb($opcode); });
@@ -294,31 +304,34 @@ mod tests {
     fn prerequisites() -> ( LR35902, MMU ){
         ( LR35902::new(), MMU::new() )
     }
-    #[test]
-    fn test_20() {
-        let ( mut cpu, mut mmu ) = prerequisites();
-        cpu.set_flag(Flag::Z);
-        // pc should be 0
-        INS_TABLE[0x20](&mut cpu, &mut mmu, [0,10,0,0]);
-        // and probably 10 now. correction, 12, because the instruction is 2 bytes long
-        assert_eq!(cpu.pc, 12);
-    }
 
-    #[test]
-    fn test_7c() { // BIT test
-        // I'm an idiot, that's a 0xCB prefix opcode, wth was I doing
-        let ( mut cpu, mut mmu ) = prerequisites();
-        cpu.h = 0b0000_0000;
-        println!("{:?}", cpu);
-        CB_INS_TABLE[0x7C](&mut cpu, &mut mmu, [0,0,0,0]);
-        println!("{:?}", cpu);
-        assert_eq!(cpu.get_flag(Flag::Z), true); // same
-        assert_eq!(cpu.get_flag(Flag::N), false);
-        assert_eq!(cpu.get_flag(Flag::H), true); // this one is ok
-        cpu.h = 0b1000_0000;
-        // CB_INS_TABLE[0x7C](&mut cpu, &mut mmu, [0,0,0,0]);
-        // assert_eq!(cpu.get_flag(Flag::Z), false); //TODO: have to check whether I need to unset the flag otherwise, probably so
-    }
+    // not yet
+
+    // #[test]
+    // fn test_20() {
+    //     let ( mut cpu, mut mmu ) = prerequisites();
+    //     cpu.set_flag(Flag::Z);
+    //     // pc should be 0
+    //     INS_TABLE[0x20](&mut cpu, &mut mmu, [0,10,0,0]);
+    //     // and probably 10 now. correction, 12, because the instruction is 2 bytes long
+    //     assert_eq!(cpu.pc, 12);
+    // }
+
+    // #[test]
+    // fn test_7c() { // BIT test
+    //     // I'm an idiot, that's a 0xCB prefix opcode, wth was I doing
+    //     let ( mut cpu, mut mmu ) = prerequisites();
+    //     cpu.h = 0b0000_0000;
+    //     println!("{:?}", cpu);
+    //     CB_INS_TABLE[0x7C](&mut cpu, &mut mmu, [0,0,0,0]);
+    //     println!("{:?}", cpu);
+    //     assert_eq!(cpu.get_flag(Flag::Z), true); // same
+    //     assert_eq!(cpu.get_flag(Flag::N), false);
+    //     assert_eq!(cpu.get_flag(Flag::H), true); // this one is ok
+    //     cpu.h = 0b1000_0000;
+    //     // CB_INS_TABLE[0x7C](&mut cpu, &mut mmu, [0,0,0,0]);
+    //     // assert_eq!(cpu.get_flag(Flag::Z), false); //TODO: have to check whether I need to unset the flag otherwise, probably so
+    // }
 
     #[test]
     fn test_reset_flag() {
@@ -330,5 +343,14 @@ mod tests {
         assert_eq!(cpu.get_flag(Flag::N), false);
         cpu.reset_flag(Flag::N);
         assert_eq!(cpu.get_flag(Flag::N), false);
+    }
+
+    #[test]
+    fn test_16bitld() {
+        let ( mut cpu, mut mmu ) = prerequisites();
+        INS_TABLE[0x01](&mut cpu, &mut mmu, [0x00, 0xFF, 0x9F, 0x00]); // little endian, so 0x9FFF should be in BC
+        assert_eq!(cpu.b, 0x9f);
+        assert_eq!(cpu.c, 0xff);
+        // add de, hl, sp checks
     }
 }
