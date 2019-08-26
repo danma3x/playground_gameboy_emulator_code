@@ -38,6 +38,24 @@ fn cb_prefix(cpu: &mut LR35902, mmu: &mut MMU, bytes: [u8;4]) {
     CB_INS_TABLE[cb_opcode as usize](cpu, mmu, bytes);
 }
 
+const fn variety_cb(opcode: u8) -> u8 {
+    let (h, l) = ((opcode & 0xF0) >> 4, (opcode & 0x0F));
+    let h_mod = h % 0x4;
+    (h_mod * 2) + (l / 8)
+}
+
+fn half_carry_add_u8(op: u8, op2: u8) -> (bool, bool, u8) { // carry, half carry, result
+    let half_carry = ((0x0F&op).wrapping_add(0x0F&op2)&0x10) > 0;
+    let (result, carry) = op.overflowing_add(op2);
+    (carry, half_carry, result)
+}
+
+fn half_carry_sub_u8(op: u8, op2: u8) -> (bool, bool, u8) { // carry, half carry, result
+    let half_carry = ((0x0F&op).wrapping_sub(0x0F&op2)&0x10) > 0;
+    let (result, carry) = op.overflowing_sub(op2);
+    (carry, half_carry, result)
+}
+
 /// Opcode processing and all cpu operation is actually described here, because this macro will codegen a unique function for each opcode and all the IF statements should be compiled away.
 /// Not much code here yet, but we should be able all of the possible operations here and get away without severe performance penalty thanks to compile time optimisations and the final code shouldn't be too hard, though 0xCB prefix will be a headache I guess
 macro_rules! g { // short for generate
@@ -55,12 +73,15 @@ macro_rules! g { // short for generate
             let mut enable_interrupts = false;
             let mut interrupts_enabled = true;
             let mut condition = false;
+            let mut carry: bool = false;
+            let mut half_carry: bool = false;
 
             cpu.t += $timing;
             cpu.pc += $inst_size;
 
             macro_rules! expand {
                ($operation:expr, $code:block) => {
+                    dbg!($operation);
                     let op_block = op_block(&$operation, op8);
                     if (op_block & (op8m as u16)) > 0 $code
                 }
@@ -105,11 +126,14 @@ macro_rules! g { // short for generate
             // OP_SRC_TO_AA
             expand!(OP_SRC_TO_AA, { t_abs_addr = t_src; });
             // OP_SRC_TO_RA
-            expand!(OP_SRC_TO_RA, { t_rel_addr = unsafe{ std::mem::transmute(t_src as u8) }; });
+            expand!(OP_SRC_TO_RA, { t_rel_addr = t_src as i8; });
             // OP_DST_TO_AA
             expand!(OP_DST_TO_AA, { t_abs_addr = t_dst; } );
             // OP_DST_TO_RA
-            expand!(OP_DST_TO_RA, { t_rel_addr = unsafe{ std::mem::transmute(t_dst as u8) }; });
+            expand!(OP_DST_TO_RA, { t_rel_addr = t_dst as i8; });
+
+            // OP_COMPLEMENT
+            //expand!(OP_EXAMPLE)
 
             expand!(OP_SRC_R_AA, { t_src = mmu.read_byte(t_abs_addr as usize) as u64; });
             expand!(OP_DST_R_AA, { t_dst = mmu.read_byte(t_abs_addr as usize) as u64; });
@@ -130,7 +154,7 @@ macro_rules! g { // short for generate
             });
             expand!(OP_INC16, { t_result = t_src + 1; });
             expand!(OP_DEC8, {
-                let (carry, half_carry, result) = half_carry_dec_u8(t_src as u8, 1);
+                let (carry, half_carry, result) = half_carry_sub_u8(t_src as u8, 1);
                 if result == 0 {
                     cpu.set_flag(Flag::Z);
                 }
@@ -139,86 +163,67 @@ macro_rules! g { // short for generate
                 }
                 t_result = result as u64;
             });
+            //right shift
+            expand!(OP_EXAMPLE, {
+                if 0x1 & t_src > 0 {
+                    cpu.set_flag(Flag::C);
+                }
+                t_result = t_src >> 0x1;
+            });
+            //left shift
+            expand!(OP_EXAMPLE, {
+                if 0x80 & t_src > 0 {
+                    cpu.set_flag(Flag::C);
+                }
+                t_result = t_src << 0x1;
+            });
+            //
+            expand!(OP_EXAMPLE, {
+                if cpu.get_flag(Flag::C) {
+                    let (carry, half_carry, temp) = half_carry_add_u8(t_dst as u8, 1);
+                    t_dst = temp as u64;
+                }
+            });
             expand!(OP_DEC16, { t_result = t_src - 1; });
+            expand!(OP_APPLY_RA_TO_AA, { t_abs_addr = t_abs_addr.wrapping_add(t_rel_addr as u64); println!("RA TO AA, {}", t_abs_addr);});
 
-            // OP_SRC_TO_RESULT, generally use only for ld
+            //expand!(OP_HLDEC, { cpu.hl -= 1; });
+            //expand!(OP_HLINC, { cpu.hl += 1; });
+            //POP
+            expand!(OP_POP_TO_SRC, { t_src = cpu.pop(&mut mmu) as u64; });
+
             expand!(OP_SRC_TO_RESULT, { t_result = t_src; });
+
+            //PUSH
+            expand!(OP_PUSH, { cpu.push(&mut mmu, t_result as u16); });
+
 
             expand!(OP_RES_W_ADDR, { mmu.write_byte(t_abs_addr as usize, t_result as u8); println!("Writing byte {} to {}", t_result, t_abs_addr);});
             expand!(OP_RES_W_RB, { cpu.b = t_result as u8; });
             expand!(OP_RES_W_RD, { cpu.d = t_result as u8; });
             expand!(OP_RES_W_RH, { cpu.h = t_result as u8; });
-            expand!(OP_RES_W_RBC, { cpu.b = (t_result >> 8) as u8; cpu.c = (t_result & 0x00FF) as u8; });
-            expand!(OP_RES_W_RDE, { cpu.d = (t_result >> 8) as u8; cpu.e = (t_result & 0x00FF) as u8; });
-            expand!(OP_RES_W_RHL, { cpu.h = (t_result >> 8) as u8; cpu.l = (t_result & 0x00FF) as u8; });
+            expand!(OP_RES_W_RAF, { cpu.a = (t_result >> 8) as u8; cpu.f = t_result as u8; });
+            expand!(OP_RES_W_RBC, { cpu.b = (t_result >> 8) as u8; cpu.c = t_result as u8; });
+            expand!(OP_RES_W_RDE, { cpu.d = (t_result >> 8) as u8; cpu.e = t_result as u8; });
+            expand!(OP_RES_W_RHL, { cpu.h = (t_result >> 8) as u8; cpu.l = t_result as u8; });
             expand!(OP_RES_W_RSP, { cpu.sp = t_result as u16; });
 
-            //expand!(OP_PUSH, { cpu.push(&mut mmu, t_src as u16); });
-            //expand!(OP_POP, { t_src = cpu.pop(&mmu) as u64; });
-
-
-            // expand!(OP_DST_A16, { t_dst mmu.read_byte(t_dst as usize, t_src as u8); });
-
-
-//            expand!(OP_RESULT_)
-
-
-            ///expand!(OP_SRC_I8, { t_rel_addr = bytes[1] as i8; });
-            //expand!(OP_SRC_STACK_OFFSET, {}); // have no idea what this is for atm, don't remember
-            //expand!(OP_SRC_8BIT_REL_ADDRESS, { t_src = t_src | 0xFF00; });
-            //expand!(OP_TRANSFORM_ADDRESS, { t_src = t_src.wrapping_add(t_rel_addr as u64); });
-            // expand!(OP_SRC_I8, { addr = bytes[1] as i8; });
-
-            // expand!(OP_SRC_STACK_OFFSET, {}); // have no idea what this is for atm, don't remember
-            // expand!(OP_SRC_8BIT_REL_ADDRESS, { t_src = t_src | 0xFF00; });
-            // expand!(OP_SRC_A16, { t_src = mmu.read_byte(t_src as usize) as u64; });
-
-
-
-
-            // Operations
-//            expand!(OP_XOR, { t_src = (cpu.a ^ (t_src as u8)) as u64; });
-//            expand!(OP_OR, { t_src = (cpu.a | (t_src as u8)) as u64; });
-//            expand!(OP_AND, { t_src = (cpu.a & (t_src as u8)) as u64; });
-//            expand!(OP_EXAMPLE, {
-//                let (carry, half_carry, result) = half_carry_add_u8(cpu.a, t_src as u8);
-//                if half_carry {
-//                    cpu.set_flag(Flag::H);
-//                    }
-//                }); // todo r8 addition
-//            // Flags
-//            expand!(OP_Z_SET_ZERO, { if t_src == 0 { cpu.set_flag(Flag::Z); }});
-//            // Store temp
-//            expand!(OP_DST_REGISTER_A, { cpu.a = t_src as u8; });
-//            expand!(OP_DST_REGISTER_B, { cpu.b = t_src as u8; });
-//            expand!(OP_DST_REGISTER_C, { cpu.c = t_src as u8; });
-//            expand!(OP_DST_REGISTER_D, { cpu.d = t_src as u8; });
-//            expand!(OP_DST_REGISTER_E, { cpu.e = t_src as u8; });
-//            expand!(OP_DST_REGISTER_H, { cpu.h = t_src as u8; });
-//            expand!(OP_DST_REGISTER_L, { cpu.l = t_src as u8; });
-//            expand!(OP_DST_REGISTER_SP, { cpu.sp = t_src as u16; });
-//            expand!(OP_DST_REGISTER_HL, { cpu.h = (t_src >> 8) as u8; cpu.l = t_src as u8; });
-//            expand!(OP_DST_ADDRESS, { t_rel_addr = t_dst as i8; }); // this is one suspicious cast
-//
-//
-//            expand!(OP_SET_N, { cpu.set_flag(Flag::N); });
-//            expand!(OP_SET_H, { cpu.set_flag(Flag::H); });
-//            expand!(OP_SET_C, { cpu.set_flag(Flag::C); });
-//            expand!(OP_RESET_Z, { cpu.reset_flag(Flag::Z); });
-//            expand!(OP_RESET_N, { cpu.reset_flag(Flag::N); });
-//            expand!(OP_RESET_H, { cpu.reset_flag(Flag::H); });
-//            expand!(OP_RESET_C, { cpu.reset_flag(Flag::C); });
-//            // set an appropriate flag as a condition here ?
-//            expand!(OP_CONDITION_Z, { condition = cpu.get_flag(Flag::Z); });
-//            expand!(OP_CONDITION_C, { condition = cpu.get_flag(Flag::C); });
-//            expand!(OP_CONDITION_NEGATE, { condition = !condition; }); // crutch for NC, NZ
-//            // break flow operation ?
-//            expand!(OP_CONDITIONAL_BREAKFLOW, { if condition { return; }} );
-//            // jump operations ?
-//            expand!(OP_CALL_STACK, { cpu.push(&mut mmu, cpu.sp + 1); });
-//            expand!(OP_GENERAL_JUMP, { cpu.pc = t_src as u16; }); // let's assume we have the address into t_src here
-//            expand!(OP_ADD_4_CLOCKS_CONDITION, { if condition { cpu.t += 4; } });
-//            expand!(OP_ADD_12_CLOCKS_CONDITION, { if condition { cpu.t += 12; } });
+            //JUMP
+            expand!(OP_JUMP_CONDITION, {
+                if $opcode & 0x10 > 0 { // make simpler
+                    condition = cpu.get_flag(Flag::Z);
+                    println!("It's flag Z");
+                } else {
+                    condition = cpu.get_flag(Flag::C);
+                    println!("It's flag C");
+                }
+                if ($opcode & 0xF) < 0x8 {
+                    condition = !condition;
+                    println!("And N");
+                }
+            });
+            expand!(OP_BREAK, { if !condition { println!("Break happened"); return; } });
+            expand!(OP_JUMP, { cpu.pc = t_abs_addr as u16; println!("Jump happened") });
 
             expand!(OP_DI, { interrupts_enabled = false; }); // disable interrupts op
             expand!(OP_EI, { enable_interrupts = true; }); // enable interrupts op
@@ -229,24 +234,6 @@ macro_rules! g { // short for generate
             }
         }
     }
-}
-
-const fn variety_cb(opcode: u8) -> u8 {
-    let (h, l) = ((opcode & 0xF0) >> 4, (opcode & 0x0F));
-    let h_mod = h % 0x4;
-    (h_mod * 2) + (l / 8)
-}
-
-fn half_carry_add_u8(op: u8, op2: u8) -> (bool, bool, u8) { // carry, half carry, result
-    let half_carry = ((0x0F&op) + (0x0F&op2)&0x10) > 0;
-    let (result, carry) = op.overflowing_add(op2);
-    (carry, half_carry, result)
-}
-
-fn half_carry_dec_u8(op: u8, op2: u8) -> (bool, bool, u8) { // carry, half carry, result
-    let half_carry = ((0x0F&op) + (0x0F&op2)&0x10) > 0;
-    let (result, carry) = op.overflowing_sub(op2);
-    (carry, half_carry, result)
 }
 
 /// Here this macro will expand in 0xFF of unique anonymous functions and we can just invoke these functions by indexing this array with the opcode
@@ -449,7 +436,7 @@ mod tests {
         let ( mut cpu, mut mmu ) = prerequisites();
         let addr: u16 = 0x100;
         cpu.a = 0xf9;
-        cpu.b = (addr >> 8) as u8; cpu.c = (addr & 0x00FF) as u8;
+        cpu.b = (addr >> 8) as u8; cpu.c = addr as u8;
         assert_eq!(cpu.b, 0x01);
         assert_eq!(cpu.c, 0x00);
         println!("{:?}", cpu);
@@ -491,5 +478,53 @@ mod tests {
         cpu.h = 50;
         INS_TABLE[0x25](&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
         assert_eq!(cpu.h, 49);
+    }
+
+    #[test]
+    fn test_conditional_jump() {
+        let ( mut cpu, mut mmu ) = prerequisites();
+        cpu.reset_flag(Flag::Z);
+        INS_TABLE[0x30](&mut cpu, &mut mmu, [0x0, 0xF, 0x0, 0x0]);
+        assert_eq!(cpu.pc, 0xF);
+        INS_TABLE[0x30](&mut cpu, &mut mmu, [0x0, 0b1011, 0x0, 0x0]);
+        assert_eq!(cpu.pc, 0xF - 4);
+    }
+
+    #[test]
+    fn test_add() {
+        let (carry, half_carry, result) = half_carry_add_u8(0b0000_1111, 0x1 );
+        assert_eq!(carry, false);
+        assert_eq!(half_carry, true);
+        assert_eq!(result, 0x10);
+        let (carry, half_carry, result) = half_carry_add_u8(0b1111_1111, 0x1 );
+        assert_eq!(result, 0x0);
+        assert_eq!(carry, true);
+        assert_eq!(half_carry, true);
+
+    }
+    #[test]
+    fn test_sub() {
+        let (carry, half_carry, result) = half_carry_sub_u8(0b0001_0000, 0x1);
+        assert_eq!(carry, false);
+        assert_eq!(result, 0x0F);
+        assert_eq!(half_carry, true);
+    }
+    fn to_bcd(val: u8) -> u8 {
+        let msb = val / 10;
+        let lsb = val % 10;
+        msb << 4 | lsb
+    }
+
+    #[test]
+    fn test_daa() {
+        let val: u8 = 32;
+        let bcd = to_bcd(val);
+        assert_eq!(bcd, 0x32);
+    }
+
+    #[test]
+    fn test_adc() {
+        let edge_case_op = 0xf0;
+        let edge_case_op2 = 0x0f;
     }
 }
