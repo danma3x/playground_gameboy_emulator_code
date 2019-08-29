@@ -1,5 +1,5 @@
-use gameboy_emulator::mmu::MMU;
-use gameboy_emulator::cpu::LR35902;
+use memory_bus::MMU;
+use lr35902::LR35902;
 use std::fs::File;
 use std::io::{Read};
 
@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cpu = LR35902::new();
 
     for _ in 0..2 {
-        cpu.execute(&mut mmu);
+        //cpu.execute(&mut mmu);
         // println!("{}", cpu.pc);
     }
     Ok(())

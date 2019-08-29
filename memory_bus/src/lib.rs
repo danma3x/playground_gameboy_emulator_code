@@ -33,7 +33,7 @@ impl MMU {
     }
 
     pub fn initialize<I>(&mut self, iter: I)
-    where I: IntoIterator<Item=u8> {
+        where I: IntoIterator<Item=u8> {
         for (i, byte) in iter.into_iter().enumerate() {
             self.write_byte(i, byte);
         }
