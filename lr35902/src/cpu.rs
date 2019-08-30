@@ -23,6 +23,7 @@ pub struct LR35902 {
     pub pc: u16,
     sp: u16,
     t: usize,
+    halted: bool,
 }
 
 const fn op8_helper(opcode: u8) -> (usize, u64) {
@@ -73,11 +74,18 @@ macro_rules! g { // short for generate
             let mut enable_interrupts = false;
             let mut interrupts_enabled = true;
             let mut condition = false;
+            let mut neg = false;
+            let mut zero = false;
             let mut carry: bool = false;
             let mut half_carry: bool = false;
 
             cpu.t += $timing;
             cpu.pc += $inst_size;
+
+            if $opcode == 0x76 {
+                cpu.halted = true;
+                return;
+            }
 
             macro_rules! expand {
                ($operation:expr, $code:block) => {
@@ -235,6 +243,18 @@ macro_rules! g { // short for generate
             expand!(OP_DI, { interrupts_enabled = false; }); // disable interrupts op
             expand!(OP_EI, { enable_interrupts = true; }); // enable interrupts op
 
+            expand!(OP_RESET_FLAG_Z, { cpu.reset_flag(Flag::Z); });
+            expand!(OP_RESET_FLAG_N, { cpu.reset_flag(Flag::N); });
+            expand!(OP_RESET_FLAG_H, { cpu.reset_flag(Flag::H); });
+            expand!(OP_RESET_FLAG_C, { cpu.reset_flag(Flag::C); });
+            expand!(OP_SET_FLAG_Z, { cpu.set_flag(Flag::Z); });
+            expand!(OP_SET_FLAG_N, { cpu.set_flag(Flag::N); });
+            expand!(OP_SET_FLAG_H, { cpu.set_flag(Flag::H); });
+            expand!(OP_SET_FLAG_C, { cpu.set_flag(Flag::C); });
+            expand!(OP_USE_FLAG_Z, { cpu.assign_flag(Flag::Z, zero); });
+            expand!(OP_USE_FLAG_H, { cpu.assign_flag(Flag::H, half_carry); });
+            expand!(OP_USE_FLAG_C, { cpu.assign_flag(Flag::C, carry); });
+
             if enable_interrupts {
                 interrupts_enabled = true;
                 enable_interrupts = false;
@@ -340,11 +360,18 @@ impl LR35902 {
             sp: 0,
             pc: 0,
             t: 0,
+            halted: false,
         }
     }
 
     pub fn set_flag(&mut self, flag: Flag) {
         self.f |= 1 << (flag as u8);
+    }
+
+    pub fn assign_flag(&mut self, flag: Flag, state: bool) {
+        let bitindex = flag as u8;
+        let state = state as u8;
+        self.f = self.f & !(1 << bitindex) | (state << bitindex);
     }
 
     pub fn reset_flag(&mut self, flag: Flag) {
@@ -767,6 +794,20 @@ mod tests {
 
 
 
+    }
+
+    #[test]
+    fn flag_test() {
+        let (mut cpu, mut mmu) = prerequisites();
+        cpu.f = 0b1000_0000;
+        cpu.assign_flag(Flag::Z, true);
+        assert_eq!(cpu.f, 0b1000_0000);
+        cpu.assign_flag(Flag::Z, false);
+        assert_eq!(cpu.f, 0);
+        cpu.assign_flag(Flag::N, true);
+        assert_eq!(cpu.f, 0b0100_0000);
+        cpu.assign_flag(Flag::N, false);
+        assert_eq!(cpu.f, 0);
     }
 
     fn to_bcd(val: u8) -> u8 {
