@@ -149,13 +149,11 @@ macro_rules! g { // short for generate
 
             // OP_INC16
             expand!(OP_INC8, {
-                let (carry, half_carry, result) = half_carry_add_u8(t_src as u8, 1);
+                let (c, hc, result) = half_carry_add_u8(t_src as u8, 1);
                 if result == 0 {
-                    cpu.set_flag(Flag::Z);
+                    zero = true;
                 }
-                if half_carry {
-                    cpu.set_flag(Flag::H);
-                }
+                half_carry = hc;
                 t_result = result as u64;
             });
             expand!(OP_XOR, { t_result = (cpu.a ^ (t_src as u8)) as u64; });
@@ -163,13 +161,11 @@ macro_rules! g { // short for generate
             expand!(OP_AND, { t_result = (cpu.a & (t_src as u8)) as u64; });
             expand!(OP_INC16, { t_result = t_src + 1; });
             expand!(OP_DEC8, {
-                let (carry, half_carry, result) = half_carry_sub_u8(t_src as u8, 1);
+                let (c, hc, result) = half_carry_sub_u8(t_src as u8, 1);
                 if result == 0 {
-                    cpu.set_flag(Flag::Z);
+                    zero = true;
                 }
-                if half_carry {
-                    cpu.set_flag(Flag::H);
-                }
+                half_carry = hc;
                 t_result = result as u64;
             });
             //right shift
@@ -189,7 +185,7 @@ macro_rules! g { // short for generate
             //
             expand!(OP_EXAMPLE, {
                 if cpu.get_flag(Flag::C) {
-                    let (carry, half_carry, temp) = half_carry_add_u8(t_dst as u8, 1);
+                    let (c, hc, temp) = half_carry_add_u8(t_dst as u8, 1);
                     t_dst = temp as u64;
                 }
             });
@@ -488,6 +484,11 @@ mod tests {
 
         g!(ld_a16_sp, 0x08, 3, 20);
 
+        g!(ld_c_d8, 0x0E, 2, 8);
+        cpu.c = 0;
+        ld_c_d8(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.c, 0x10);
+
 
 //        let addr = 0x6000;
 //        let b = 0x5B5B;
@@ -500,9 +501,7 @@ mod tests {
     #[test]
     fn inc_dec_test() {
         let (mut cpu, mut mmu) = prerequisites();
-        g!(inc_bc, 0x03, 1, 8); // bc, d16
-        g!(inc_de, 0x13, 1, 8);
-        g!(inc_hl, 0x23, 1, 8);
+        
         g!(inc_sp, 0x33, 1, 8);
         g!(inc_b, 0x04, 1, 4);
         g!(inc_d, 0x14, 1, 4);
@@ -526,18 +525,21 @@ mod tests {
         g!(dec_l, 0x2D, 1, 4);
         g!(dec_a, 0x3D, 1, 4);
 
+        g!(inc_bc, 0x03, 1, 8); // bc, d16
         cpu.b=0x00;
         cpu.c=0xFF;
         inc_bc(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
         assert_eq!(cpu.b, 0x1);
         assert_eq!(cpu.c, 0x0);
 
+        g!(inc_de, 0x13, 1, 8);
         cpu.d=0x00;
         cpu.e=0xFF;
         inc_de(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
         assert_eq!(cpu.d, 0x1);
         assert_eq!(cpu.e, 0x0);
 
+        g!(inc_hl, 0x23, 1, 8);
         cpu.h=0x00;
         cpu.l=0xFF;
         inc_hl(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
