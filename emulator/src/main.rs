@@ -4,6 +4,8 @@ use std::fs::File;
 use std::io::{Read};
 
 
+
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut mmu  = {
         let mut mmu = MMU::new();
@@ -15,10 +17,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut cpu = LR35902::new();
+    cpu.execute(&mut mmu);
 
-    for _ in 0..2 {
-        //cpu.execute(&mut mmu);
-        // println!("{}", cpu.pc);
+    for _ in 0..5 {
+        cpu.execute(&mut mmu);
+        println!("{}", cpu.pc);
     }
     Ok(())
 }
