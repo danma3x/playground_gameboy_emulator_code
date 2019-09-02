@@ -2,7 +2,7 @@ use super::*;
 
 fn cb_prefix(cpu: &mut LR35902, mmu: &mut MMU, bytes: [u8;4]) {
    let cb_opcode = bytes[1];
-   CB_INS_TABLE[cb_opcode as usize](cpu, mmu, bytes);
+   (CB_INS_TABLE[cb_opcode as usize].handler)(cpu, mmu, bytes);
 }
 
 g!(f_00, 0x00, 1, 4);  g!(f_01, 0x01, 3, 12); g!(f_02, 0x02, 1, 8);  g!(f_03, 0x03, 1, 8);  g!(f_04, 0x04, 1, 4);  g!(f_05, 0x05, 1, 4);  g!(f_06, 0x06, 2, 8);  g!(f_07, 0x07, 1, 4);  g!(f_08, 0x08, 3, 20); g!(f_09, 0x09, 1, 8);  g!(f_0A, 0x0A, 1, 8);  g!(f_0B, 0x0B, 1, 8); g!(f_0C, 0x0C, 1, 4);  g!(f_0D, 0x0D, 1, 4);  g!(f_0E, 0x0E, 2, 8); g!(f_0F, 0x0F, 1, 4);
@@ -39,9 +39,9 @@ cb_g!(fc_D0, 0xD0, 2, 8); cb_g!(fc_D1, 0xD1, 2, 8); cb_g!(fc_D2, 0xD2, 2, 8); cb
 cb_g!(fc_E0, 0xE0, 2, 8); cb_g!(fc_E1, 0xE1, 2, 8); cb_g!(fc_E2, 0xE2, 2, 8); cb_g!(fc_E3, 0xE3, 2, 8); cb_g!(fc_E4, 0xE4, 2, 8); cb_g!(fc_E5, 0xE5, 2, 8); cb_g!(fc_E6, 0xE6, 2, 16); cb_g!(fc_E7, 0xE7, 2, 8); cb_g!(fc_E8, 0xE8, 2, 8); cb_g!(fc_E9, 0xE9, 2, 8); cb_g!(fc_EA, 0xEA, 2, 8); cb_g!(fc_EB, 0xEB, 2, 8); cb_g!(fc_EC, 0xEC, 2, 8); cb_g!(fc_ED, 0xED, 2, 8); cb_g!(fc_EE, 0xEE, 2, 16); cb_g!(fc_EF, 0xEF, 2, 8);
 cb_g!(fc_F0, 0xF0, 2, 8); cb_g!(fc_F1, 0xF1, 2, 8); cb_g!(fc_F2, 0xF2, 2, 8); cb_g!(fc_F3, 0xF3, 2, 8); cb_g!(fc_F4, 0xF4, 2, 8); cb_g!(fc_F5, 0xF5, 2, 8); cb_g!(fc_F6, 0xF6, 2, 16); cb_g!(fc_F7, 0xF7, 2, 8); cb_g!(fc_F8, 0xF8, 2, 8); cb_g!(fc_F9, 0xF9, 2, 8); cb_g!(fc_FA, 0xFA, 2, 8); cb_g!(fc_FB, 0xFB, 2, 8); cb_g!(fc_FC, 0xFC, 2, 8); cb_g!(fc_FD, 0xFD, 2, 8); cb_g!(fc_FE, 0xFE, 2, 16); cb_g!(fc_FF, 0xFF, 2, 8);
 
-const CB_OP: OpHandler = cb_prefix as OpHandler;
+const CB_OP: PendingOperation = PendingOperation { handler: cb_prefix as OpHandler, timing: |_cpu: &LR35902| -> u8 { 0 } as TimingHandler} ;
 
-pub(super) const INS_TABLE: [OpHandler; 256] = [
+pub(super) const INS_TABLE: [PendingOperation; 256] = [
     f_00, f_01, f_02, f_03, f_04, f_05, f_06, f_07, f_08, f_09, f_0A, f_0B,  f_0C, f_0D, f_0E, f_0F,
     f_10, f_11, f_12, f_13, f_14, f_15, f_16, f_17, f_18, f_19, f_1A, f_1B,  f_1C, f_1D, f_1E, f_1F,
     f_20, f_21, f_22, f_23, f_24, f_25, f_26, f_27, f_28, f_29, f_2A, f_2B,  f_2C, f_2D, f_2E, f_2F,
@@ -60,7 +60,7 @@ pub(super) const INS_TABLE: [OpHandler; 256] = [
     f_F0, f_F1, f_F2, f_F3, f_F4, f_F5, f_F6, f_F7, f_F8, f_F9, f_FA, f_FB,  f_FC, f_FD, f_FE, f_FF, 
 ];
 
-pub(super) const CB_INS_TABLE: [OpHandler; 256] = [
+pub(super) const CB_INS_TABLE: [PendingOperation; 256] = [
     fc_00, fc_01, fc_02, fc_03, fc_04, fc_05, fc_06, fc_07, fc_08, fc_09, fc_0A, fc_0B, fc_0C, fc_0D, fc_0E, fc_0F,
     fc_10, fc_11, fc_12, fc_13, fc_14, fc_15, fc_16, fc_17, fc_18, fc_19, fc_1A, fc_1B, fc_1C, fc_1D, fc_1E, fc_1F,
     fc_20, fc_21, fc_22, fc_23, fc_24, fc_25, fc_26, fc_27, fc_28, fc_29, fc_2A, fc_2B, fc_2C, fc_2D, fc_2E, fc_2F,

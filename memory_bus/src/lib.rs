@@ -1,10 +1,37 @@
+pub struct CharacterRAM {
+    tiles: Vec<u8>,
+}
+
+impl Default for CharacterRAM {
+    fn default() -> CharacterRAM {
+        CharacterRAM {
+            tiles: Vec::with_capacity(0x1800)
+        }
+    }
+}
+
+pub struct BGMapData {
+    tile_index: Vec<u8>,
+}
+
+impl Default for BGMapData {
+    fn default() -> BGMapData {
+        BGMapData {
+            tile_index: Vec::with_capacity(0xFF)
+        }
+    }
+}
+
 pub struct MMU {
-    ram: Vec<u8>,
+    pub ram: Vec<u8>,
+    // pub bgmapdata1: BGMapData,
+    // pub bgmapdata2: BGMapData,
+    // pub cram: CharacterRAM,
 }
 
 impl MMU {
     pub fn new() -> MMU {
-        let ram= vec![0; 65_536];
+        let ram = vec![0;0x10000];
         MMU {
             ram
         }
@@ -15,8 +42,8 @@ impl MMU {
         ret
     }
 
-    pub fn read_word(&self, at: usize) -> u16 {
-        let word = ((self.ram[at] as u16) << 8) + (self.ram[at+1] as u16);
+    pub fn read_word(&self, at: usize) -> u16 { // le
+        let word = (self.ram[at] as u16) | ((self.ram[at+1] as u16) << 8);
         word
     }
 
@@ -28,8 +55,9 @@ impl MMU {
         self.ram[at] = byte;
     }
 
-    pub fn write_word(&mut self, at: usize, word: u16) {
-        unimplemented!()
+    pub fn write_word(&mut self, at: usize, word: u16) { // le
+        self.ram[at] = word as u8;
+        self.ram[at+1] = (word >> 8) as u8;
     }
 
     pub fn initialize<I>(&mut self, iter: I)

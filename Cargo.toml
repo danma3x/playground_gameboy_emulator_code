@@ -2,5 +2,6 @@
 members = [
     "lr35902",
     "memory_bus",
+    "ppu",
     "emulator"
 ]
