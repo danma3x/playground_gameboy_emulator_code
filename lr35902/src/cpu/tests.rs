@@ -143,70 +143,6 @@ fn ld_test() {
     }
 
     {
-        g!(ld_b_b, 0x40, 1, 4);
-        cpu.b = 1;
-        (ld_b_b.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
-        assert_eq!(cpu.b, 1);
-
-        g!(ld_b_c, 0x41, 1, 4);
-        cpu.c = 2;
-        (ld_b_c.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
-        assert_eq!(cpu.b, 2);
-
-        g!(ld_b_d, 0x42, 1, 4);
-        cpu.d = 3;
-        (ld_b_d.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
-        assert_eq!(cpu.b, 3);
-
-        g!(ld_b_e, 0x43, 1, 4);
-        cpu.e = 4;
-        (ld_b_e.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
-        assert_eq!(cpu.b, 4);
-
-        g!(ld_b_h, 0x44, 1, 4);
-        cpu.h = 5;
-        (ld_b_h.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
-        assert_eq!(cpu.b, 5);
-
-        g!(ld_b_l, 0x45, 1, 4);
-        cpu.l = 6;
-        (ld_b_l.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
-        assert_eq!(cpu.b, 6);
-
-        //
-
-        g!(ld_d_b, 0x50, 1, 4);
-        cpu.b = 5;
-        (ld_d_b.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
-        assert_eq!(cpu.d, 5);
-
-        g!(ld_d_c, 0x51, 1, 4);
-        cpu.c = 6;
-        (ld_d_c.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
-        assert_eq!(cpu.d, 6);
-
-        g!(ld_d_d, 0x52, 1, 4);
-        cpu.d = 7;
-        (ld_d_d.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
-        assert_eq!(cpu.d, 7);
-
-        g!(ld_d_e, 0x53, 1, 4);
-        cpu.e = 8;
-        (ld_d_e.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
-        assert_eq!(cpu.d, 8);
-
-        g!(ld_d_h, 0x54, 1, 4);
-        cpu.h = 9;
-        (ld_d_h.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
-        assert_eq!(cpu.d, 9);
-
-        g!(ld_d_l, 0x55, 1, 4);
-        cpu.l = 10;
-        (ld_d_l.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
-        assert_eq!(cpu.d, 10);
-    }
-
-    {
         g!(ld_b_ahl, 0x46, 1, 4);
         cpu.h = 0x2;
         cpu.l = 0x0;
@@ -258,12 +194,340 @@ fn ld_test() {
         (ld_a_ahl.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
         assert_eq!(cpu.a, 0x86);
     }
-//        let addr = 0x6000;
-//        let b = 0x5B5B;
-//        cpu.sp = b;
-//        mmu.write_byte(addr, b);
-//        ld_a16_sp(&mut cpu, &mut mmu, [0x0, 0x0, 0x60, 0x0]);
-//        assert_eq!(mmu.read_byte(addr), )
+
+    //0x40 - 0x47
+    {
+        g!(ld_b_b, 0x40, 1, 4);
+        cpu.b = 1;
+        (ld_b_b.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.b, 1);
+
+        g!(ld_b_c, 0x41, 1, 4);
+        cpu.c = 2;
+        (ld_b_c.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.b, 2);
+
+        g!(ld_b_d, 0x42, 1, 4);
+        cpu.d = 3;
+        (ld_b_d.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.b, 3);
+
+        g!(ld_b_e, 0x43, 1, 4);
+        cpu.e = 4;
+        (ld_b_e.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.b, 4);
+
+        g!(ld_b_h, 0x44, 1, 4);
+        cpu.h = 5;
+        (ld_b_h.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.b, 5);
+
+        g!(ld_b_l, 0x45, 1, 4);
+        cpu.l = 6;
+        (ld_b_l.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.b, 6);
+
+        g!(ld_b_a, 0x47, 1, 4);
+        cpu.a = 0x50;
+        (ld_b_a.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.b, 0x50);
+    }
+    //0x50 - 0x57
+    {
+        g!(ld_d_b, 0x50, 1, 4);
+        cpu.b = 5;
+        (ld_d_b.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.d, 5);
+
+        g!(ld_d_c, 0x51, 1, 4);
+        cpu.c = 6;
+        (ld_d_c.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.d, 6);
+
+        g!(ld_d_d, 0x52, 1, 4);
+        cpu.d = 7;
+        (ld_d_d.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.d, 7);
+
+        g!(ld_d_e, 0x53, 1, 4);
+        cpu.e = 8;
+        (ld_d_e.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.d, 8);
+
+        g!(ld_d_h, 0x54, 1, 4);
+        cpu.h = 9;
+        (ld_d_h.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.d, 9);
+
+        g!(ld_d_l, 0x55, 1, 4);
+        cpu.l = 10;
+        (ld_d_l.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.d, 10);
+
+        g!(ld_d_a, 0x57, 1, 4);
+        cpu.a = 0x41;
+        (ld_d_a.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.d, 0x41);
+    }
+    //0x60 - 0x67
+    {
+        g!(ld_h_b, 0x60, 1, 4);
+        cpu.b = 5;
+        (ld_h_b.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.h, 5);
+
+        g!(ld_h_c, 0x61, 1, 4);
+        cpu.c = 6;
+        (ld_h_c.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.h, 6);
+
+        g!(ld_h_d, 0x62, 1, 4);
+        cpu.d = 7;
+        (ld_h_d.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.h, 7);
+
+        g!(ld_d_e, 0x63, 1, 4);
+        cpu.e = 8;
+        (ld_d_e.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.h, 8);
+
+        g!(ld_h_h, 0x64, 1, 4);
+        cpu.h = 9;
+        (ld_h_h.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.h, 9);
+
+        g!(ld_h_l, 0x65, 1, 4);
+        cpu.l = 10;
+        (ld_h_l.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.h, 10);
+
+        g!(ld_h_a, 0x67, 1, 4);
+        cpu.a = 0x41;
+        (ld_h_a.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.h, 0x41);
+    }
+    //0x48 - 0x4F
+    {
+        g!(ld_c_b, 0x48, 1, 4);
+        cpu.b = 0x51;
+        (ld_c_b.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.c, 0x51);
+
+        g!(ld_c_c, 0x49, 1, 4);
+        cpu.c = 0x0;
+        (ld_c_c.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.c, 0x0);
+
+        g!(ld_c_d, 0x4A, 1, 4);
+        cpu.d = 0x12;
+        (ld_c_d.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.c, 0x12);
+
+        g!(ld_c_e, 0x4B, 1, 4);
+        cpu.e = 0x13;
+        (ld_c_e.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.c, 0x13);
+
+        g!(ld_c_h, 0x4C, 1, 4);
+        cpu.h = 0x16;
+        (ld_c_h.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.c, 0x16);
+
+        g!(ld_c_l, 0x4D, 1, 4);
+        cpu.l = 0x18;
+        (ld_c_l.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.c, 0x18);
+
+        g!(ld_c_a, 0x4F, 1, 4);
+        cpu.a = 0x25;
+        (ld_c_a.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.c, 0x25);
+    }
+    //0x58 - 0x5F
+    {
+        g!(ld_e_b, 0x58, 1, 4);
+        cpu.b = 0x51;
+        (ld_e_b.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.e, 0x51);
+
+        g!(ld_e_c, 0x59, 1, 4);
+        cpu.c = 0x10;
+        (ld_e_c.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.e, 0x10);
+
+        g!(ld_e_d, 0x5A, 1, 4);
+        cpu.d = 0x12;
+        (ld_e_d.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.e, 0x12);
+
+        g!(ld_e_e, 0x5B, 1, 4);
+        cpu.e = 0x13;
+        (ld_e_e.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.e, 0x13);
+
+        g!(ld_e_h, 0x5C, 1, 4);
+        cpu.h = 0x16;
+        (ld_e_h.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.e, 0x16);
+
+        g!(ld_e_l, 0x5D, 1, 4);
+        cpu.l = 0x18;
+        (ld_e_l.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.e, 0x18);
+
+        g!(ld_e_a, 0x5F, 1, 4);
+        cpu.a = 0x25;
+        (ld_e_a.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.e, 0x25);
+    }
+    //0x68 - 0x6F
+    {
+        g!(ld_l_b, 0x68, 1, 4);
+        cpu.b = 0x51;
+        (ld_l_b.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.l, 0x51);
+
+        g!(ld_l_c, 0x69, 1, 4);
+        cpu.c = 0x10;
+        (ld_l_c.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.l, 0x10);
+
+        g!(ld_l_d, 0x6A, 1, 4);
+        cpu.d = 0x12;
+        (ld_l_d.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.l, 0x12);
+
+        g!(ld_l_e, 0x6B, 1, 4);
+        cpu.e = 0x13;
+        (ld_l_e.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.l, 0x13);
+
+        g!(ld_l_h, 0x6C, 1, 4);
+        cpu.h = 0x16;
+        (ld_l_h.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.l, 0x16);
+
+        g!(ld_l_l, 0x6D, 1, 4);
+        cpu.l = 0x18;
+        (ld_l_l.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.l, 0x18);
+
+        g!(ld_l_a, 0x6F, 1, 4);
+        cpu.a = 0x25;
+        (ld_l_a.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.l, 0x25);
+    }
+    //0x78 - 0x7F
+    {
+        g!(ld_a_b, 0x78, 1, 4);
+        cpu.b = 0x51;
+        (ld_a_b.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.a, 0x51);
+
+        g!(ld_a_c, 0x79, 1, 4);
+        cpu.c = 0x10;
+        (ld_a_c.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.a, 0x10);
+
+        g!(ld_a_d, 0x7A, 1, 4);
+        cpu.d = 0x12;
+        (ld_a_d.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.a, 0x12);
+
+        g!(ld_a_e, 0x7B, 1, 4);
+        cpu.e = 0x13;
+        (ld_a_e.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.a, 0x13);
+
+        g!(ld_a_h, 0x7C, 1, 4);
+        cpu.h = 0x16;
+        (ld_a_h.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.a, 0x16);
+
+        g!(ld_a_l, 0x7D, 1, 4);
+        cpu.l = 0x18;
+        (ld_a_l.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.a, 0x18);
+
+        g!(ld_a_a, 0x7F, 1, 4);
+        cpu.a = 0x25;
+        (ld_a_a.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(cpu.a, 0x25);
+    }
+
+    //0x70 - 0x77
+    {
+        g!(ld_ahl_b, 0x70, 1, 4);
+        cpu.b = 0x26;
+        cpu.h = 0x11;
+        cpu.l = 0x11;
+        (ld_ahl_b.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(mmu.read_byte(0x1111), 0x26);
+
+        g!(ld_ahl_c, 0x71, 1, 4);
+        cpu.c = 0x28;
+        cpu.h = 0x12;
+        cpu.l = 0x12;
+        (ld_ahl_c.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(mmu.read_byte(0x1212), 0x28);
+
+        g!(ld_ahl_d, 0x72, 1, 4);
+        cpu.d = 0x29;
+        cpu.h = 0x13;
+        cpu.l = 0x13;
+        (ld_ahl_d.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(mmu.read_byte(0x1313), 0x29);
+
+        g!(ld_ahl_e, 0x73, 1, 4);
+        cpu.e = 0x30;
+        cpu.h = 0x14;
+        cpu.l = 0x14;
+        (ld_ahl_e.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(mmu.read_byte(0x1414), 0x30);
+
+        g!(ld_ahl_h, 0x74, 1, 4);
+        cpu.h = 0x15;
+        cpu.l = 0x15;
+        (ld_ahl_h.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(mmu.read_byte(0x1515), 0x15);
+
+        g!(ld_ahl_l, 0x75, 1, 4);
+        cpu.h = 0x16;
+        cpu.l = 0x16;
+        (ld_ahl_l.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(mmu.read_byte(0x1616), 0x16);
+
+        g!(ld_ahl_a, 0x77, 1, 4);
+        cpu.a = 0x88;
+        cpu.h = 0x17;
+        cpu.l = 0x17;
+        (ld_ahl_a.handler)(&mut cpu, &mut mmu, [0x0, 0x10, 0x0, 0x0]);
+        assert_eq!(mmu.read_byte(0x1717), 0x88);
+    }
+
+    g!(ld_a8_a, 0xE0, 2, 12);
+    cpu.a = 0xF5;
+    (ld_a8_a.handler)(&mut cpu, &mut mmu, [0x0, 0xF4, 0x0, 0x0]);
+    assert_eq!(mmu.read_word(0xFFF4), 0xF5);
+
+    g!(ld_a_a8, 0xF0, 2, 12);
+    mmu.write_byte(0xFFF1, 0x5);
+    (ld_a_a8.handler)(&mut cpu, &mut mmu, [0x0, 0xF1, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0x5);
+
+    g!(ld_ac_a, 0xE2, 2, 12);
+    cpu.c = 0x11;
+    cpu.a = 0x15;
+    (ld_ac_a.handler)(&mut cpu, &mut mmu, [0x0, 0xF1, 0x0, 0x0]);
+    assert_eq!(mmu.read_byte(0xFF11), 0x15);
+
+    g!(ld_a_ac, 0xF2, 2, 12);
+    cpu.c = 0x66;
+    mmu.write_byte(0xFF66, 0x55);
+    (ld_a_ac.handler)(&mut cpu, &mut mmu, [0x0, 0xF1, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0x55);
+
+    //g!(ld_hl_spr8, 0xF8, )
 }
 
 #[test]
@@ -511,10 +775,58 @@ fn xor_test() {
 #[test]
 fn and_test() {
     let (mut cpu, mut mmu) = prerequisites();
+    g!(and_a, 0xA7, 1, 4);
+    cpu.a = 0b1111_0000;
+    (and_a.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b1111_0000);
+
     g!(and_b, 0xA0, 1, 4);
     cpu.a = 0b1111_0000;
     cpu.b = 0b0101_0101;
     (and_b.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b0101_0000);
+
+    g!(and_c, 0xA1, 1, 4);
+    cpu.a = 0b1111_0000;
+    cpu.c = 0b0101_0101;
+    (and_c.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b0101_0000);
+
+    g!(and_d, 0xA2, 1, 4);
+    cpu.a = 0b1111_0000;
+    cpu.d = 0b0101_0101;
+    (and_d.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b0101_0000);
+
+    g!(and_e, 0xA3, 1, 4);
+    cpu.a = 0b1111_0000;
+    cpu.e = 0b0101_0101;
+    (and_e.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b0101_0000);
+
+    g!(and_h, 0xA4, 1, 4);
+    cpu.a = 0b1111_0000;
+    cpu.h = 0b0101_0101;
+    (and_h.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b0101_0000);
+
+    g!(and_l, 0xA5, 1, 4);
+    cpu.a = 0b1111_0000;
+    cpu.l = 0b0101_0101;
+    (and_l.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b0101_0000);
+
+    g!(and_ahl, 0xA6, 1, 4);
+    cpu.a = 0b1111_0000;
+    cpu.h = 0x33;
+    cpu.l = 0x22;
+    mmu.write_byte(0x3322, 0b0101_0101);
+    (and_ahl.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b0101_0000);
+
+    g!(and_d8, 0xE6, 2, 4);
+    cpu.a = 0b1111_0000;
+    (and_d8.handler)(&mut cpu, &mut mmu, [0x0, 0b0101_0101, 0x0, 0x0]);
     assert_eq!(cpu.a, 0b0101_0000);
 }
 
@@ -526,6 +838,49 @@ fn or_test() {
     cpu.b = 0b0000_1111;
     (or_b.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
     assert_eq!(cpu.a, 0b1010_1111);
+
+    g!(or_c, 0xB1, 1, 4);
+    cpu.a = 0b1010_1010;
+    cpu.c = 0b0000_1111;
+    (or_c.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b1010_1111);
+
+    g!(or_d, 0xB2, 1, 4);
+    cpu.a = 0b1010_1010;
+    cpu.d = 0b0000_1111;
+    (or_d.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b1010_1111);
+
+    g!(or_e, 0xB3, 1, 4);
+    cpu.a = 0b1010_1010;
+    cpu.e = 0b0000_1111;
+    (or_e.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b1010_1111);
+
+    g!(or_h, 0xB4, 1, 4);
+    cpu.a = 0b1010_1010;
+    cpu.h = 0b0000_1111;
+    (or_h.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b1010_1111);
+
+    g!(or_l, 0xB5, 1, 4);
+    cpu.a = 0b1010_1010;
+    cpu.l = 0b0000_1111;
+    (or_l.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b1010_1111);
+
+    g!(or_ahl, 0xB6, 1, 4);
+    cpu.a = 0b1010_1010;
+    cpu.h = 0x55;
+    cpu.l = 0x44;
+    mmu.write_byte(0x5544, 0b0000_1111);
+    (or_ahl.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b1010_1111);
+
+    g!(or_a, 0xB7, 1, 4);
+    cpu.a = 0b1010_1010;
+    (or_a.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0b1010_1010);
 }
 
 #[test]
@@ -610,6 +965,56 @@ fn call_ret_test() {
     assert_eq!(cpu.sp, 0xFFFB);
     assert_eq!(cpu.pc, 0x106);
 
+}
+
+#[test]
+fn push_pop_test() {
+    let (mut cpu, mut mmu) = prerequisites();
+    cpu.sp = 0xFEFF;
+
+    g!(push_bc, 0xC5, 1, 16);
+    g!(pop_bc, 0xC1, 1, 16);
+    cpu.b = 0x50;
+    cpu.c = 0x40;
+    (push_bc.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    cpu.b = 0x0;
+    cpu.c = 0x0;
+    (pop_bc.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.b, 0x50);
+    assert_eq!(cpu.c, 0x40);
+
+    g!(push_de, 0xD5, 1, 16);
+    g!(pop_de, 0xD1, 1, 16);
+    cpu.d = 0x50;
+    cpu.e = 0x40;
+    (push_de.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    cpu.d = 0x0;
+    cpu.e = 0x0;
+    (pop_de.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.d, 0x50);
+    assert_eq!(cpu.e, 0x40);
+    
+    g!(push_hl, 0xE5, 1, 16);
+    g!(pop_hl, 0xE1, 1, 16);
+    cpu.h = 0x50;
+    cpu.l = 0x40;
+    (push_hl.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    cpu.h = 0x0;
+    cpu.l = 0x0;
+    (pop_hl.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.h, 0x50);
+    assert_eq!(cpu.l, 0x40);
+
+    g!(push_af, 0xF5, 1, 16);
+    g!(pop_af, 0xF1, 1, 16);
+    cpu.a = 0x50;
+    cpu.f = 0x40;
+    (push_af.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    cpu.a = 0x0;
+    cpu.f = 0x0;
+    (pop_af.handler)(&mut cpu, &mut mmu, [0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(cpu.a, 0x50);
+    assert_eq!(cpu.f, 0x40);
 }
 
 

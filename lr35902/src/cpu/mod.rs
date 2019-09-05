@@ -289,9 +289,9 @@ macro_rules! g { // short for generate
 
                 // OP_COMPLEMENT
                 //expand!(OP_EXAMPLE)
+                expand!(OP_8BIT_AA, { t_abs_addr |= 0xFF00; } );
                 expand!(OP_SRC_R_AA, { t_src = mmu.read_byte(t_abs_addr as usize) as u16; });
                 expand!(OP_DST_R_AA, { t_dst = mmu.read_byte(t_abs_addr as usize) as u16; });
-                expand!(OP_8BIT_AA, { t_abs_addr |= 0xFF00; } );
                 // operations
                 // should write to t_result generally, where we can write it however we want
 
